@@ -118,6 +118,19 @@ The output of running `fs-metadata .` (after deleting the contents of `node_modu
     }
 
 
+## Checksums
+
+- Every **file** has a checksum generated from its content (the filename and any flags or extended attributes are ignored). This is a SHA-1 hash, and is equivalent to calling `shasum` at the command line.
+  + Even empty files have a checksum, of course, namely, "da39a3ee5e6b4b0d3255bfef95601890afd80709".
+- Every **symlink** has a checksum generated from its target. Again, it's a SHA-1 hash, equivalent to the output of `readlink ur.lnk | tr -d '\n' | shasum`.
+- Every **directory** has a checksum generated from its children's names and checksums, using these steps:
+  1. Lexicographically sort the children by name
+  2. Append each child's checksum to its name, resulting in a single string for each child
+  3. Join these strings with newlines, resulting in a single string for all the children
+  4. Hash that resulting string with SHA-1
+- Every other kind of file, like sockets and FIFOs, are given a checksum of "0000000000000000000000000000000000000000".
+
+
 ## License
 
 Copyright 2015 Christopher Brown. [MIT Licensed](http://chbrown.github.io/licenses/MIT/#2015).

@@ -21,7 +21,7 @@ else {
   var fsMetadata = require('../index');
   fsMetadata.read(argv._[0], function(error, node) {
     if (error) {
-      console.error(error);
+      console.error(error.toString());
       process.exit(1);
     }
     // without the callback, only the first 2^16 bytes will be written to piped output

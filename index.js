@@ -3,12 +3,22 @@ var path_1 = require('path');
 // Use lstat instead of stat (since stat automatically resolves symlinks)
 var fs_1 = require('fs');
 var crypto_1 = require('crypto');
+function assign(target, source) {
+    Object.keys(source).forEach(function (key) {
+        target[key] = source[key];
+    });
+    return target;
+}
 /**
-@param {string} algorithm - One of the strings returned from crypto.getHashes()
+Read the given stream to end and return its SHA-1 hash as a string in hex digest form.
 */
-function checksum(algorithm, stream, callback) {
-    // node.d.ts only has old createHash type declarations
-    var hash = crypto_1.createHash(algorithm);
+function hashStream(stream, callback) {
+    // The 'algorithm' argument to createHash can be any one of the strings
+    // returned from crypto.getHashes(). I'm going with 'sha1' since it's
+    // 2^80 (≈1e24) collision-resistent, and easy to recreate; the 'sha1'
+    // algorithm is equivalent to the command line's `shasum` default.
+    // using <any>, since node.d.ts only has old non-streaming createHash type declarations
+    var hash = crypto_1.createHash('sha1');
     // we have to call setEncoding here, not in the on('end', ...) callback (bug?)
     hash.setEncoding('hex');
     stream.pipe(hash);
@@ -19,6 +29,13 @@ function checksum(algorithm, stream, callback) {
         var digest = hash.read();
         callback(null, digest);
     });
+}
+exports.nullChecksum = '0000000000000000000000000000000000000000';
+function hashString(input) {
+    var hash = crypto_1.createHash('sha1');
+    hash.update(input);
+    var digest = hash.digest('hex');
+    return digest;
 }
 /**
 Resolve an fs.Stats instance to its file type.
@@ -45,7 +62,7 @@ function statsType(stats) {
         return 'socket';
 }
 /**
-
+Recursively read a FSNode tree, returning an object that represents the file at the given path.
 */
 function read(path, callback) {
     fs_1.lstat(path, function (error, stats) {
@@ -65,38 +82,39 @@ function read(path, callback) {
             fs_1.readdir(path, function (error, files) {
                 if (error)
                     return callback(error);
-                // is this the default from readdir?
-                // files.sort();
-                var paths = files.map(function (file) { return path_1.join(path, file); });
-                async.map(paths, read, function (error, nodes) {
+                // not sure what order readdir produces by default, but lexicographic
+                // ordering seems a reasonable schelling point.
+                files.sort();
+                // TypeScript can infer the async.map output type if I use just read,
+                // but not if I use an anonymous function. Weird.
+                async.map(files, function (file, callback) { return read(path_1.join(path, file), callback); }, function (error, nodes) {
                     if (error)
                         return callback(error);
-                    node.children = nodes;
-                    callback(null, node);
+                    // the directory checksum is somewhat arbitrary, but relatively simple
+                    var checksum = hashString(nodes.map(function (node) { return node.name + node.checksum; }).join('\n'));
+                    callback(null, assign(node, { checksum: checksum, children: nodes }));
                 });
             });
         }
         else if (node.type == 'file') {
             // files require a checksum
-            // the 'sha1' algorithm is equivalent to the `shasum` command line default
-            // sha1 is 2^80 collision-resistent, which is on the order of 1e24
-            checksum('sha1', fs_1.createReadStream(path), function (error, digest) {
+            hashStream(fs_1.createReadStream(path), function (error, checksum) {
                 if (error)
                     return callback(error);
-                node.checksum = digest;
-                callback(null, node);
+                callback(null, assign(node, { checksum: checksum }));
             });
         }
         else if (node.type == 'symlink') {
             fs_1.readlink(path, function (error, linkString) {
                 if (error)
                     return callback(error);
-                node.target = linkString;
-                callback(null, node);
+                // it's a silly checksum, but it keeps things uniform
+                var checksum = hashString(linkString);
+                callback(null, assign(node, { checksum: checksum, target: linkString }));
             });
         }
         else {
-            callback(null, node);
+            callback(null, assign(node, { checksum: exports.nullChecksum }));
         }
     });
 }
