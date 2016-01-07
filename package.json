@@ -13,7 +13,6 @@
     "type": "git",
     "url": "https://github.com/chbrown/fs-metadata.git"
   },
-  "private": true,
   "author": "Christopher Brown <io@henrian.com> (http://henrian.com)",
   "license": "MIT",
   "dependencies": {
