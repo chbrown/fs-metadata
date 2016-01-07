@@ -1,0 +1,30 @@
+{
+  "name": "fs-metadata",
+  "description": "File System Metadata",
+  "keywords": [
+    "file",
+    "system",
+    "user",
+    "interface"
+  ],
+  "version": "0.0.0",
+  "homepage": "https://github.com/chbrown/fs-metadata",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chbrown/fs-metadata.git"
+  },
+  "private": true,
+  "author": "Christopher Brown <io@henrian.com> (http://henrian.com)",
+  "license": "MIT",
+  "dependencies": {
+    "async": "*",
+    "optimist": "*"
+  },
+  "devDependencies": {
+    "declarations": "*",
+    "typescript": "*"
+  },
+  "bin": {
+    "fs-metadata": "bin/fs-metadata"
+  }
+}
