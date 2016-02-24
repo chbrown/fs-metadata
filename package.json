@@ -25,5 +25,8 @@
   },
   "bin": {
     "fs-metadata": "bin/fs-metadata"
+  },
+  "scripts": {
+    "prepublish": "make"
   }
 }
