@@ -21,7 +21,7 @@ function hashStream(stream: NodeJS.ReadableStream,
   // 2^80 (≈1e24) collision-resistent, and easy to recreate; the 'sha1'
   // algorithm is equivalent to the command line's `shasum` default.
   // using <any>, since node.d.ts only has old non-streaming createHash type declarations
-  let hash = <any>createHash('sha1');
+  const hash = <any>createHash('sha1');
   // we have to call setEncoding here, not in the on('end', ...) callback (bug?)
   hash.setEncoding('hex');
   stream.pipe(hash);
@@ -29,7 +29,7 @@ function hashStream(stream: NodeJS.ReadableStream,
     callback(error);
   });
   stream.on('end', () => {
-    let digest = hash.read();
+    const digest = hash.read();
     callback(null, digest);
   });
 }
@@ -37,11 +37,13 @@ function hashStream(stream: NodeJS.ReadableStream,
 export const nullChecksum = '0000000000000000000000000000000000000000';
 
 function hashString(input: string): string {
-  let hash = createHash('sha1');
+  const hash = createHash('sha1');
   hash.update(input);
-  let digest = hash.digest('hex');
+  const digest = hash.digest('hex');
   return digest;
 }
+
+export type FSNodeType = 'file' | 'directory' | 'device' | 'symlink' | 'fifo' | 'socket';
 
 /**
 Resolve an fs.Stats instance to its file type.
@@ -51,7 +53,7 @@ It's unclear if this would ever happen.
 
 @returns {string} One of "file", "directory", "device", "symlink", "fifo", or "socket"
 */
-function statsType(stats: Stats): string {
+function statsType(stats: Stats): FSNodeType {
   if (stats.isFile()) return 'file';
   if (stats.isDirectory()) return 'directory';
   if (stats.isBlockDevice()) return 'device';
@@ -69,7 +71,7 @@ export interface FSNode {
   name: string;
 
   /** type of file, one of "file", "directory", "device", "symlink", "fifo", or "socket" (fs.Stats.is*()) */
-  type: string;
+  type: FSNodeType;
   /** The total size of file in bytes (fs.Stats.size) */
   size: number;
   /** Epoch time when file data last accessed (fs.Stats.atime.getTime() / 1000) */
@@ -100,7 +102,7 @@ export function read(path: string, callback: (error: Error, node?: FSNode) => vo
   lstat(path, (error, stats) => {
     if (error) return callback(error);
 
-    let node = {
+    const node = {
       name: basename(path),
       type: statsType(stats),
       size: stats.size,
@@ -125,7 +127,7 @@ export function read(path: string, callback: (error: Error, node?: FSNode) => vo
           if (error) return callback(error);
 
           // the directory checksum is somewhat arbitrary, but relatively simple
-          let checksum = hashString(nodes.map(node => node.name + node.checksum).join('\n'));
+          const checksum = hashString(nodes.map(node => node.name + node.checksum).join('\n'));
           callback(null, assign(node, {checksum, children: nodes}));
         });
       });
@@ -143,7 +145,7 @@ export function read(path: string, callback: (error: Error, node?: FSNode) => vo
         if (error) return callback(error);
 
         // it's a silly checksum, but it keeps things uniform
-        let checksum = hashString(linkString);
+        const checksum = hashString(linkString);
         callback(null, assign(node, {checksum, target: linkString}));
       });
     }
