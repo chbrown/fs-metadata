@@ -14,8 +14,8 @@ function assign<T, U>(target: T, source: U): T & U {
 /**
 Read the given stream to end and return its SHA-1 hash as a string in hex digest form.
 */
-function hashStream(stream: NodeJS.ReadableStream,
-                    callback: (error: Error, checksum?: string) => void) {
+export function hashStream(stream: NodeJS.ReadableStream,
+                           callback: (error: Error, checksum?: string) => void) {
   // The 'algorithm' argument to createHash can be any one of the strings
   // returned from crypto.getHashes(). I'm going with 'sha1' since it's
   // 2^80 (≈1e24) collision-resistent, and easy to recreate; the 'sha1'
@@ -36,7 +36,10 @@ function hashStream(stream: NodeJS.ReadableStream,
 
 export const nullChecksum = '0000000000000000000000000000000000000000';
 
-function hashString(input: string): string {
+/**
+Read the given string and return its SHA-1 hash as a string in hex digest form.
+*/
+export function hashString(input: string): string {
   const hash = createHash('sha1');
   hash.update(input);
   const digest = hash.digest('hex');
