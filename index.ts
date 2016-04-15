@@ -1,6 +1,5 @@
 import * as async from 'async';
 import {join, dirname, basename} from 'path';
-// Use lstat instead of stat (since stat automatically resolves symlinks)
 import {readdir, readlink, lstat, Stats, createReadStream} from 'fs';
 import {createHash} from 'crypto';
 
@@ -69,7 +68,7 @@ function statsType(stats: Stats): FSNodeType {
 /**
 N.b.: Directories have size.
 */
-export interface FSNode {
+export interface FSNodeStructure {
   /** local filename of this node, does not contain any parental information */
   name: string;
 
@@ -86,22 +85,60 @@ export interface FSNode {
   /** Epoch time of file creation. Set once when the file is created (fs.Stats.birthtime.getTime() / 1000) */
   btime: number;
 
+  /** If type == 'directory', represents the children of this node (files inside this directory) */
+  children?: this[];
+  /** If type == 'symlink', represents the target of the link */
+  target?: string;
+}
+
+export interface FSNode extends FSNodeStructure {
   /** A SHA-1 hash represented as a hex digest.
   If type == 'file', it's computed from the file's bytes.
   If type == 'directory', it's computed from the names and checksums of its children (see the readme).
   If type == 'symlink', it's computed from its target path.
   Otherwise, it's '0000000000000000000000000000000000000000'. */
   checksum: string;
-  /** If type == 'directory', represents the children of this node (files inside this directory) */
-  children?: FSNode[];
-  /** If type == 'symlink', represents the target of the link */
-  target?: string;
 }
 
 /**
 Recursively read a FSNode tree, returning an object that represents the file at the given path.
 */
-export function read(path: string, callback: (error: Error, node?: FSNode) => void): void {
+export function readChecksums(node: FSNodeStructure, parentPath: string, callback: (error: Error, node?: FSNode) => void): void {
+  const path = join(parentPath, node.name);
+  if (node.type == 'directory') {
+    async.map<FSNodeStructure, FSNode>(node.children, (childNode, callback) => {
+      readChecksums(childNode, path, callback);
+    }, (error, nodes) => {
+      if (error) return callback(error);
+      // the directory checksum is somewhat arbitrary, but relatively simple
+      const checksum = hashString(nodes.map(node => node.name + node.checksum).join('\n'));
+      callback(null, assign(node, {checksum, children: nodes}));
+    });
+  }
+  else if (node.type == 'file') {
+    // files require a checksum
+    hashStream(createReadStream(path), (error, checksum) => {
+      if (error) return callback(error);
+
+      callback(null, assign(node, {checksum, children: undefined}));
+    });
+  }
+  else if (node.type == 'symlink') {
+    // it's a silly checksum, but it keeps things uniform
+    const checksum = hashString(node.target);
+    callback(null, assign(node, {checksum, children: undefined}));
+  }
+  else {
+    callback(null, assign(node, {checksum: nullChecksum, children: undefined}));
+  }
+}
+
+/**
+Recursively read a FSNode tree, without checksums, returning as the root node
+a representation of the file at the given path.
+*/
+export function readStructure(path: string, callback: (error: Error, node?: FSNodeStructure) => void): void {
+  // Use lstat instead of stat (since stat automatically resolves symlinks)
   lstat(path, (error, stats) => {
     if (error) return callback(error);
 
@@ -126,34 +163,30 @@ export function read(path: string, callback: (error: Error, node?: FSNode) => vo
 
         // TypeScript can infer the async.map output type if I use just read,
         // but not if I use an anonymous function. Weird.
-        async.map<string, FSNode>(files, (file, callback) => read(join(path, file), callback), (error, nodes) => {
+        async.map<string, FSNode>(files, (file, callback) => readStructure(join(path, file), callback), (error, nodes) => {
           if (error) return callback(error);
-
-          // the directory checksum is somewhat arbitrary, but relatively simple
-          const checksum = hashString(nodes.map(node => node.name + node.checksum).join('\n'));
-          callback(null, assign(node, {checksum, children: nodes}));
+          callback(null, assign(node, {children: nodes}));
         });
       });
     }
     else if (node.type == 'file') {
-      // files require a checksum
-      hashStream(createReadStream(path), (error, checksum) => {
-        if (error) return callback(error);
-
-        callback(null, assign(node, {checksum}));
-      });
+      callback(null, node);
     }
     else if (node.type == 'symlink') {
       readlink(path, (error, linkString) => {
         if (error) return callback(error);
-
-        // it's a silly checksum, but it keeps things uniform
-        const checksum = hashString(linkString);
-        callback(null, assign(node, {checksum, target: linkString}));
+        callback(null, assign(node, {target: linkString}));
       });
     }
     else {
-      callback(null, assign(node, {checksum: nullChecksum}));
+      callback(null, node);
     }
+  });
+}
+
+export function read(path: string, callback: (error: Error, node?: FSNode) => void): void {
+  readStructure(path, (error, node) => {
+    if (error) return callback(error);
+    readChecksums(node, dirname(path), callback);
   });
 }
