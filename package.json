@@ -16,12 +16,12 @@
   "author": "Christopher Brown <io@henrian.com> (http://henrian.com)",
   "license": "MIT",
   "dependencies": {
-    "async": "*",
-    "optimist": "*"
+    "async": "1.5.2",
+    "optimist": "0.6.1"
   },
   "devDependencies": {
-    "declarations": "*",
-    "typescript": "*"
+    "declarations": "0.1.12",
+    "typescript": "1.8.2"
   },
   "bin": {
     "fs-metadata": "bin/fs-metadata"
